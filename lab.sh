@@ -10,10 +10,26 @@ reset="\e[0m"
 
 pause() { read -rp "Press ENTER to continue..." _; }
 
-deploy_lab() {
-  echo -e "${green}>>> Deploying / starting lab VMs with Vagrant...${reset}"
+deploy_lab_all() {
+  echo -e "${green}>>> Deploying / starting ALL lab VMs with Vagrant...${reset}"
   vagrant up
   echo -e "${green}>>> Lab deployment complete.${reset}"
+  pause
+}
+
+deploy_lab_custom() {
+  clear
+  echo -e "${yellow}Custom VM deployment${reset}"
+  echo
+  echo "Defined VMs (from Vagrantfile):"
+  echo "  controller reposerver servera serverb serverc serverd servere"
+  echo
+  read -rp "Enter VM names to start (space-separated): " vms
+  [[ -z "${vms}" ]] && { echo "No VMs selected."; pause; return 0; }
+
+  echo -e "${green}>>> Deploying selected VMs: ${vms}${reset}"
+  vagrant up ${vms}
+  echo -e "${green}>>> Selected VMs deployment complete.${reset}"
   pause
 }
 
@@ -29,7 +45,8 @@ destroy_lab() {
   case "$choice" in
     a|A)
       echo -e "${red}>>> Destroying ALL VMs...${reset}"
-      vagrant destroy -f
+      # Ignore SSH errors on shutdown; Vagrant will still force-destroy
+      vagrant destroy -f || true
       ;;
     b|B)
       echo
@@ -37,6 +54,7 @@ destroy_lab() {
       vagrant status | sed '1,2d'
       echo
       read -rp "Enter VM names to destroy (space-separated): " vms
+      [[ -z "${vms}" ]] && { echo "No VMs selected."; pause; return 0; }
       for vm in $vms; do
         echo -e "${red}>>> Destroying ${vm}...${reset}"
         vagrant destroy -f "$vm" || true
@@ -75,19 +93,21 @@ main_menu() {
     clear
     echo -e "${yellow}${TITLE}${reset}"
     echo
-    echo "1) Deploy / Start Lab Elements"
-    echo "2) Destroy Lab Elements"
-    echo "3) SSH into a VM"
-    echo "4) Run lab_setup.sh on controller"
-    echo "5) Exit"
+    echo "1) Deploy / Start ALL Lab VMs"
+    echo "2) Deploy / Start SELECTED Lab VMs"
+    echo "3) Destroy Lab Elements"
+    echo "4) SSH into a VM"
+    echo "5) Run lab_setup.sh on controller"
+    echo "6) Exit"
     echo
-    read -rp "Choose an option [1-5]: " opt
+    read -rp "Choose an option [1-6]: " opt
     case "$opt" in
-      1) deploy_lab ;;
-      2) destroy_lab ;;
-      3) ssh_menu ;;
-      4) run_lab_setup ;;
-      5) exit 0 ;;
+      1) deploy_lab_all ;;
+      2) deploy_lab_custom ;;
+      3) destroy_lab ;;
+      4) ssh_menu ;;
+      5) run_lab_setup ;;
+      6) exit 0 ;;
       *) echo "Invalid choice"; pause ;;
     esac
   done
