@@ -1,38 +1,96 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-show_menu() {
-  cat <<'MENU'
-RHCE RHEL 9.6 Lab
+TITLE="RHCE Dynamic Lab Environment Manager"
 
-1) Start full lab: controller, reposerver, servera-servere
-2) Start controller only
-3) Start reposerver only
-4) Start managed nodes only
-5) Halt all machines
-6) Destroy all machines
-7) Show status
-8) Copy controller SSH key to lab servers
-9) Test Ansible ping from controller
-q) Quit
-MENU
+green="\e[32m"
+red="\e[31m"
+yellow="\e[33m"
+reset="\e[0m"
+
+pause() { read -rp "Press ENTER to continue..." _; }
+
+deploy_lab() {
+  echo -e "${green}>>> Deploying / starting lab VMs with Vagrant...${reset}"
+  vagrant up
+  echo -e "${green}>>> Lab deployment complete.${reset}"
+  pause
 }
 
-while true; do
-  show_menu
-  read -rp 'Choose an option: ' choice
-  case "$choice" in
-    1) vagrant up ;;
-    2) vagrant up controller ;;
-    3) vagrant up reposerver ;;
-    4) vagrant up servera serverb serverc serverd servere ;;
-    5) vagrant halt ;;
-    6) vagrant destroy -f ;;
-    7) vagrant status ;;
-    8) vagrant ssh controller -c 'sudo rhce-copy-ssh-keys redhat' ;;
-    9) vagrant ssh controller -c 'sudo -iu ansi_user ansible all -m ping' ;;
-    q|Q) exit 0 ;;
-    *) echo 'Invalid option.' ;;
-  esac
+destroy_lab() {
+  clear
+  echo -e "${red}VM Destruction Options${reset}"
   echo
- done
+  echo -e "  a) Destroy ${red}EVERYTHING${reset} (wipe entire lab cluster)"
+  echo -e "  b) Custom destruction selection (pick individual VMs)"
+  echo
+  read -rp "Select teardown strategy [a/b]: " choice
+
+  case "$choice" in
+    a|A)
+      echo -e "${red}>>> Destroying ALL VMs...${reset}"
+      vagrant destroy -f
+      ;;
+    b|B)
+      echo
+      echo "Existing VMs:"
+      vagrant status | sed '1,2d'
+      echo
+      read -rp "Enter VM names to destroy (space-separated): " vms
+      for vm in $vms; do
+        echo -e "${red}>>> Destroying ${vm}...${reset}"
+        vagrant destroy -f "$vm" || true
+      done
+      ;;
+    *)
+      echo "Invalid option"
+      ;;
+  esac
+  pause
+}
+
+ssh_menu() {
+  clear
+  echo -e "${yellow}SSH Quick Access${reset}"
+  echo
+  echo "Vagrant-defined VMs (from Vagrantfile):"
+  vagrant status | sed '1,2d'
+  echo
+  read -rp "Enter VM name to SSH into (or blank to cancel): " vm
+  [[ -z "$vm" ]] && return 0
+  vagrant ssh "$vm"
+}
+
+run_lab_setup() {
+  echo
+  echo "This will run /vagrant/lab_setup.sh inside controller as root."
+  read -rp "Continue? [y/N]: " ans
+  [[ "${ans,,}" != "y" ]] && return 0
+  vagrant ssh controller -c "sudo /vagrant/lab_setup.sh"
+  pause
+}
+
+main_menu() {
+  while true; do
+    clear
+    echo -e "${yellow}${TITLE}${reset}"
+    echo
+    echo "1) Deploy / Start Lab Elements"
+    echo "2) Destroy Lab Elements"
+    echo "3) SSH into a VM"
+    echo "4) Run lab_setup.sh on controller"
+    echo "5) Exit"
+    echo
+    read -rp "Choose an option [1-5]: " opt
+    case "$opt" in
+      1) deploy_lab ;;
+      2) destroy_lab ;;
+      3) ssh_menu ;;
+      4) run_lab_setup ;;
+      5) exit 0 ;;
+      *) echo "Invalid choice"; pause ;;
+    esac
+  done
+}
+
+main_menu
