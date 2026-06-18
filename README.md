@@ -1,101 +1,144 @@
-# RHCE RHEL 9.6 VirtualBox Lab
+Here is a ready‑to‑use `README.md` you can drop into your repo alongside the other files. It explains the lab, requirements, and exact commands to run from Git Bash with Vagrant, following patterns used in other Vagrant+Ansible lab projects. [github](https://github.com/goffinet/vagrant-ansible-lab)
 
-This repository builds a local RHCE practice lab using your own RHEL 9.6 vanilla Vagrant box.
+***
 
-## Lab machines
+```markdown
+# RH_ENG_2026 – RHCE RHEL 9 Lab
 
-| VM | IP | Purpose |
-|---|---:|---|
-| controller | 192.168.56.10 | Ansible control node |
-| reposerver | 192.168.56.20 | Local HTTP package repository |
-| servera | 192.168.56.11 | Managed node |
-| serverb | 192.168.56.12 | Managed node |
-| serverc | 192.168.56.13 | Managed node |
-| serverd | 192.168.56.14 | Managed node |
-| servere | 192.168.56.15 | Managed node |
+This repository contains a Vagrant‑based multi‑VM lab environment for RHCE (EX294) practice on **RHEL 9** style systems.  
+It spins up a controller, a repository server, and five managed nodes, and configures them for Ansible practice.
 
-## Users
+## Lab topology
 
-| User | Password | SSH access | Sudo |
-|---|---|---|---|
-| vagrant | vagrant | yes | passwordless |
-| ansi_user | redhat | yes | passwordless |
-| test_user | redhat | no | no |
+All VMs are created in VirtualBox on a host‑only network (`192.168.56.0/24`):
 
-`test_user` is blocked from SSH through `/etc/ssh/sshd_config.d/99-rhce-lab.conf`.
+| Role       | Hostname                        | IP address       |
+|-----------|----------------------------------|------------------|
+| Controller| `controller.lab.example.com`     | `192.168.56.10`  |
+| Repo      | `reposerver.lab.example.com`     | `192.168.56.11`  |
+| Node 1    | `servera.lab.example.com`        | `192.168.56.21`  |
+| Node 2    | `serverb.lab.example.com`        | `192.168.56.22`  |
+| Node 3    | `serverc.lab.example.com`        | `192.168.56.23`  |
+| Node 4    | `serverd.lab.example.com`        | `192.168.56.24`  |
+| Node 5    | `servere.lab.example.com`        | `192.168.56.25`  |
 
-## Required local Vagrant box
+Every VM has two local users:
 
-This lab expects a local Vagrant box named:
+- `ansi_user` – primary automation user, password `redhat`, passwordless sudo, SSH allowed.
+- `test_user` – test/local login user, password `redhat`, no SSH keys configured.
 
-```bash
-rhel96-vanilla
+An `/etc/hosts` file is deployed to each VM so they can resolve each other by short and FQDN hostnames.
+
+## Components
+
+Repository layout:
+
+- `Vagrantfile`  
+  Defines all seven VMs, their hostnames, IPs, resources, and provisioning hooks.
+- `lab.sh`  
+  Menu‑driven wrapper around `vagrant up`, `vagrant destroy`, and `vagrant ssh`.
+- `lab_setup.sh`  
+  Additional setup that runs **inside the controller** to install `ansible-core` and create a lab inventory and `ansible.cfg`.
+- `provision/bootstrap.sh`  
+  Base provisioning script executed on **every** VM during `vagrant up` (hostname, static IP, users, sudo, sshd, `/etc/hosts`).
+- `provision/controller.sh`  
+  Extra provisioning executed only on the controller VM (creates Ansible folder structure and config).
+
+## Requirements
+
+On the **host machine** (Windows with Git Bash, Linux, or macOS):
+
+- [VirtualBox](https://www.virtualbox.org/) installed.
+- [Vagrant](https://developer.hashicorp.com/vagrant) installed.
+- Git Bash or any POSIX‑style shell (for running `lab.sh`).
+
+Vagrant downloads the base box `generic/rhel9` by default.  
+If you have your own RHEL 9.6 base box, you can change the box name in the `Vagrantfile`.
+
+## Quick start
+
+1. Clone the repository:
+
+   ```bash
+   git clone https://github.com/<your-username>/RH_ENG_2026.git
+   cd RH_ENG_2026
+   ```
+
+2. Make scripts executable (first time only):
+
+   ```bash
+   chmod +x lab.sh lab_setup.sh
+   chmod +x provision/bootstrap.sh provision/controller.sh
+   ```
+
+3. Launch the lab manager:
+
+   ```bash
+   ./lab.sh
+   ```
+
+4. In the menu, choose:
+
+   - `1) Deploy / Start Lab Elements` to run `vagrant up` and create all VMs.
+   - After `vagrant up` completes, choose  
+     `4) Run lab_setup.sh on controller` to install `ansible-core` and bootstrap the Ansible lab on the controller.
+
+5. SSH into the controller from the menu:
+
+   - `3) SSH into a VM` → type `controller`.
+
+6. On the controller, switch to the Ansible user and test:
+
+   ```bash
+   sudo -iu ansi_user
+   cd ~/lab
+   ansible all -m ping
+   ```
+
+   (You may still need to distribute `ansi_user`'s SSH key to the nodes using `ssh-copy-id` or an Ansible playbook.)
+
+Vagrant‑based labs typically use `vagrant up` for creation/provisioning and `vagrant destroy -f` for teardown, which is exactly what this wrapper script automates for you [web:39][web:58].
+
+## Managing the lab
+
+From the repo root:
+
+- **Start / provision all VMs**
+
+  ```bash
+  ./lab.sh
+  # option 1
+  ```
+
+- **Destroy all VMs**
+
+  ```bash
+  ./lab.sh
+  # option 2 -> a) Destroy EVERYTHING
+  ```
+
+- **Destroy selected VMs only**
+
+  ```bash
+  ./lab.sh
+  # option 2 -> b) Custom destruction selection
+  ```
+
+- **SSH into a specific VM**
+
+  ```bash
+  ./lab.sh
+  # option 3, then enter VM name (e.g. controller, servera)
+  ```
+
+You can also use raw Vagrant commands directly (e.g. `vagrant up`, `vagrant destroy -f`, `vagrant ssh controller`) if you prefer [web:39][web:45].
+
+## Customization
+
+- To change IPs or hostnames, edit the `LAB_NODES` hash and `LAB_DOMAIN` in `Vagrantfile`.
+- To change RAM/CPU per VM, adjust the `vb.memory` and `vb.cpus` values in `Vagrantfile`.
+- To change usernames or passwords, edit `ANSI_USER`, `TEST_USER`, and `PASS` in `provision/bootstrap.sh` and `lab_setup.sh`.
+- To use a different base box (e.g. your own RHEL 9.6), change `BASE_BOX` in `Vagrantfile` to your box name.
+
+This structure mirrors other public Vagrant+Ansible labs used for RHCE‑style environments, but is tuned for your specific RHEL 9 practice topology [web:49][web:54].
 ```
-
-Create it from your existing RHEL 9.6 VirtualBox VM:
-
-```bash
-vagrant package --base "RHEL-9.6-Vanilla" --output rhel96-vanilla.box
-vagrant box add rhel96-vanilla ./rhel96-vanilla.box
-```
-
-Replace `RHEL-9.6-Vanilla` with the exact VM name from:
-
-```bash
-VBoxManage list vms
-```
-
-## Start the lab
-
-```bash
-chmod +x lab_setup.sh
-./lab_setup.sh
-```
-
-Or directly:
-
-```bash
-vagrant up
-```
-
-## Copy Ansible SSH keys
-
-After all machines are up:
-
-```bash
-vagrant ssh controller
-sudo rhce-copy-ssh-keys redhat
-sudo -iu ansi_user
-ansible all -m ping
-```
-
-## Optional Red Hat registration
-
-If your RHEL box needs Red Hat registration during provisioning:
-
-```bash
-export RH_USER='your-redhat-username'
-export RH_PASS='your-redhat-password'
-vagrant up
-```
-
-Do not commit credentials to Git.
-
-## Optional environment variables
-
-```bash
-export LAB_BOX='rhel96-vanilla'
-export LAB_PASSWORD='redhat'
-```
-
-## Repository server options
-
-The default `reposerver` creates a small HTTP repo from downloaded RPMs when online repos are available.
-
-For a stronger offline lab, attach the RHEL 9.6 ISO to `reposerver` and run:
-
-```bash
-sudo /vagrant/scripts/mount-rhel-iso-repo.sh /dev/sr0
-```
-
-Because synced folders are disabled by default, you may instead copy the script manually or temporarily enable synced folders in the Vagrantfile.
