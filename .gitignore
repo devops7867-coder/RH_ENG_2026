@@ -1,5 +1,30 @@
+# Vagrant
 .vagrant/
 *.box
-*.log
-.DS_Store
+
+# Environment / secrets
 .env
+.env.local
+.env.*.local
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+*.swo
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Python / Ansible cache
+__pycache__/
+*.pyc
+*.pyo
+.cache/
+*.retry
+
+# IDE / editor
+.vscode/
+.idea/
+*.iml
